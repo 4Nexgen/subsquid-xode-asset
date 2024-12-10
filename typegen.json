@@ -1,0 +1,14 @@
+{
+  "outDir": "src/types",
+  "specVersions": "metadata.json",
+  "pallets": {
+    "Balances": {
+      "events": [
+        "Transfer"
+      ],
+      "calls": [],
+      "storage": [],
+      "constants": []
+    }
+  }
+}

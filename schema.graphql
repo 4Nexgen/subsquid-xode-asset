@@ -1,0 +1,41 @@
+type Account @entity {
+  "Account address"
+  id: ID!
+  transfersTo: [Transfer!] @derivedFrom(field: "to")
+  transfersFrom: [Transfer!] @derivedFrom(field: "from")
+  assetTransfersTo: [AssetTransfer!] @derivedFrom(field: "to")
+  assetTransfersFrom: [AssetTransfer!] @derivedFrom(field: "from")
+}
+
+type Transfer @entity {
+  id: ID!
+  blockNumber: Int! @index
+  timestamp: DateTime! @index
+  extrinsicHash: String @index
+  from: Account!
+  to: Account!
+  amount: BigInt! @index
+  fee: BigInt # fee is calculated at the best effort and may be zero for some old extrinsics
+}
+
+type Asset @entity {
+  "Unique identifier for the asset"
+  id: ID!
+  "Name or symbol of the asset"
+  name: String
+  "Total supply of the asset"
+  totalSupply: BigInt!
+  "List of transfers for this asset"
+  transfers: [AssetTransfer!] @derivedFrom(field: "asset")
+}
+
+type AssetTransfer @entity {
+  id: ID!
+  blockNumber: Int! @index
+  timestamp: DateTime! @index
+  extrinsicHash: String @index
+  asset: Asset!
+  from: Account
+  to: Account
+  amount: BigInt! @index
+}
