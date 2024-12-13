@@ -1,13 +1,13 @@
-import {TypeormDatabase, Store} from '@subsquid/typeorm-store';
-import {In} from 'typeorm';
+import { TypeormDatabase, Store } from '@subsquid/typeorm-store';
+import { In } from 'typeorm';
 import * as ss58 from '@subsquid/ss58';
 import assert from 'assert';
 
-import {processor, ProcessorContext} from './processor';
-import {Account, Transfer, Asset, AssetTransfer} from './model'; // Add Asset and AssetTransfer models
-import {events} from './types';
+import { processor, ProcessorContext } from './processor';
+import { Account, Transfer, Asset, AssetTransfer } from './model'; // Add Asset and AssetTransfer models
+import { events } from './types';
 
-processor.run(new TypeormDatabase({supportHotBlocks: true}), async (ctx) => {
+processor.run(new TypeormDatabase({ supportHotBlocks: true }), async (ctx) => {
     let transferEvents: TransferEvent[] = getTransferEvents(ctx);
     let assetTransferEvents: AssetTransferEvent[] = getAssetTransferEvents(ctx);
 
@@ -51,19 +51,18 @@ function getTransferEvents(ctx: ProcessorContext<Store>): TransferEvent[] {
     for (let block of ctx.blocks) {
         for (let event of block.events) {
             if (event.name == events.balances.transfer.name) {
-                let rec: {from: string; to: string; amount: bigint};
-                if (events.balances.transfer.v1020.is(event)) {
-                    let [from, to, amount] = events.balances.transfer.v1020.decode(event);
-                    rec = {from, to, amount};
-                } else if (events.balances.transfer.v1050.is(event)) {
-                    let [from, to, amount] = events.balances.transfer.v1050.decode(event);
-                    rec = {from, to, amount};
-                } else if (events.balances.transfer.v9130.is(event)) {
-                    rec = events.balances.transfer.v9130.decode(event);
+                let rec: { from: string; to: string; amount: bigint };
+
+                // Handle different versions of the transfer event
+                if (events.balances.transfer.v1.is(event)) {
+                    // If `decode` returns an object, destructure its properties
+                    const decoded = events.balances.transfer.v1.decode(event);
+                    rec = { from: decoded.from, to: decoded.to, amount: decoded.amount };
                 } else {
-                    throw new Error('Unsupported spec');
+                    throw new Error('Unsupported transfer event version');
                 }
 
+                // Ensure that the timestamp is available
                 assert(block.header.timestamp, `Got an undefined timestamp at block ${block.header.height}`);
 
                 transfers.push({
@@ -79,8 +78,10 @@ function getTransferEvents(ctx: ProcessorContext<Store>): TransferEvent[] {
             }
         }
     }
+
     return transfers;
 }
+
 
 function getAssetTransferEvents(ctx: ProcessorContext<Store>): AssetTransferEvent[] {
     let assetTransfers: AssetTransferEvent[] = [];
@@ -92,29 +93,13 @@ function getAssetTransferEvents(ctx: ProcessorContext<Store>): AssetTransferEven
                 let rec: { assetId: string; from?: string; to?: string; amount: bigint };
 
                 // Handle different versions of the assets transfer event
-                if (events.assets.transferred.v1020.is(event)) {
-                    let [assetId, from, to, amount] = events.assets.transferred.v1020.decode(event);
-                    rec = { 
-                        assetId: assetId.toString(), // Convert assetId from bigint to string
-                        from, 
-                        to, 
-                        amount 
-                    };
-                } else if (events.assets.transferred.v1050.is(event)) {
-                    let [assetId, from, to, amount] = events.assets.transferred.v1050.decode(event);
-                    rec = { 
-                        assetId: assetId.toString(), // Convert assetId from bigint to string
-                        from, 
-                        to, 
-                        amount 
-                    };
-                } else if (events.assets.transferred.v9130.is(event)) {
-                    let decoded = events.assets.transferred.v9130.decode(event);
-                    rec = { 
+                if (events.assets.transferred.v1.is(event)) {
+                    let decoded = events.assets.transferred.v1.decode(event);
+                    rec = {
                         assetId: decoded.assetId.toString(), // Convert assetId from bigint to string
-                        from: decoded.from, 
-                        to: decoded.to, 
-                        amount: decoded.amount 
+                        from: decoded.from ? decoded.from.toString() : undefined,
+                        to: decoded.to ? decoded.to.toString() : undefined,
+                        amount: decoded.amount,
                     };
                 } else {
                     throw new Error('Unsupported asset transfer event version');
@@ -140,8 +125,6 @@ function getAssetTransferEvents(ctx: ProcessorContext<Store>): AssetTransferEven
     return assetTransfers;
 }
 
-
-
 async function createAccounts(ctx: ProcessorContext<Store>, transferEvents: TransferEvent[], assetTransferEvents: AssetTransferEvent[]): Promise<Map<string, Account>> {
     const accountIds = new Set<string>();
     for (let t of transferEvents) {
@@ -153,13 +136,13 @@ async function createAccounts(ctx: ProcessorContext<Store>, transferEvents: Tran
         if (t.to) accountIds.add(t.to);
     }
 
-    const accounts = await ctx.store.findBy(Account, {id: In([...accountIds])}).then((accounts) => {
+    const accounts = await ctx.store.findBy(Account, { id: In([...accountIds]) }).then((accounts) => {
         return new Map(accounts.map((a) => [a.id, a]));
     });
 
     for (let id of accountIds) {
         if (!accounts.has(id)) {
-            accounts.set(id, new Account({id}));
+            accounts.set(id, new Account({ id }));
         }
     }
 
@@ -172,13 +155,13 @@ async function createAssets(ctx: ProcessorContext<Store>, assetTransferEvents: A
         assetIds.add(t.assetId);
     }
 
-    const assets = await ctx.store.findBy(Asset, {id: In([...assetIds])}).then((assets) => {
+    const assets = await ctx.store.findBy(Asset, { id: In([...assetIds]) }).then((assets) => {
         return new Map(assets.map((a) => [a.id, a]));
     });
 
     for (let id of assetIds) {
         if (!assets.has(id)) {
-            assets.set(id, new Asset({id, totalSupply: 0n})); // Initialize with 0 supply; update later if needed.
+            assets.set(id, new Asset({ id, totalSupply: 0n })); // Initialize with 0 supply; update later if needed.
         }
     }
 
@@ -188,7 +171,7 @@ async function createAssets(ctx: ProcessorContext<Store>, assetTransferEvents: A
 function createTransfers(transferEvents: TransferEvent[], accounts: Map<string, Account>): Transfer[] {
     let transfers: Transfer[] = [];
     for (let t of transferEvents) {
-        let {id, blockNumber, timestamp, extrinsicHash, amount, fee} = t;
+        let { id, blockNumber, timestamp, extrinsicHash, amount, fee } = t;
         let from = accounts.get(t.from)!;
         let to = accounts.get(t.to)!;
         transfers.push(new Transfer({
@@ -208,7 +191,7 @@ function createTransfers(transferEvents: TransferEvent[], accounts: Map<string, 
 function createAssetTransfers(assetTransferEvents: AssetTransferEvent[], accounts: Map<string, Account>, assets: Map<string, Asset>): AssetTransfer[] {
     let assetTransfers: AssetTransfer[] = [];
     for (let t of assetTransferEvents) {
-        let {id, blockNumber, timestamp, extrinsicHash, amount, assetId} = t;
+        let { id, blockNumber, timestamp, extrinsicHash, amount, assetId } = t;
         let from = t.from ? accounts.get(t.from) : undefined;
         let to = t.to ? accounts.get(t.to) : undefined;
         let asset = assets.get(assetId)!;

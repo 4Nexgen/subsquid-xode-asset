@@ -5,10 +5,12 @@
     "Balances": {
       "events": [
         "Transfer"
-      ],
-      "calls": [],
-      "storage": [],
-      "constants": []
+      ]
+    },
+    "Assets": {
+      "events": [
+        "Transferred"
+      ]
     }
   }
 }
