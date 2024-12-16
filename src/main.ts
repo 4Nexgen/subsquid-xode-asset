@@ -155,18 +155,35 @@ async function createAssets(ctx: ProcessorContext<Store>, assetTransferEvents: A
         assetIds.add(t.assetId);
     }
 
+    // Fetch existing assets from the store
     const assets = await ctx.store.findBy(Asset, { id: In([...assetIds]) }).then((assets) => {
+        console.log('Fetched assets:', assets);
+        assets.forEach((asset) => {
+            console.log(`Asset ID: ${asset.id}, Asset Name: ${asset.name}`);
+        });
         return new Map(assets.map((a) => [a.id, a]));
     });
-
+    
+    // Initialize assets that do not exist in the store
     for (let id of assetIds) {
         if (!assets.has(id)) {
-            assets.set(id, new Asset({ id, totalSupply: 0n })); // Initialize with 0 supply; update later if needed.
+            // If asset is new, initialize with zero total supply and an optional name field.
+            assets.set(id, new Asset({ id, totalSupply: 0n, name: `Asset-${id}` }));
+        }
+    }
+
+    // Update the total supply for each asset based on the asset transfer events
+    for (let event of assetTransferEvents) {
+        let asset = assets.get(event.assetId);
+        if (asset) {
+            // Adjust total supply based on transfer amounts (this logic depends on your use case)
+            asset.totalSupply += event.amount;
         }
     }
 
     return assets;
 }
+
 
 function createTransfers(transferEvents: TransferEvent[], accounts: Map<string, Account>): Transfer[] {
     let transfers: Transfer[] = [];
