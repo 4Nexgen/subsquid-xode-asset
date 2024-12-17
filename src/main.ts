@@ -6,13 +6,24 @@ import assert from 'assert';
 import { processor, ProcessorContext } from './processor';
 import { Account, Transfer, Asset, AssetTransfer } from './model'; // Add Asset and AssetTransfer models
 import { events } from './types';
+import { ALL } from 'dns';
+
+import { ApiPromise, WsProvider } from '@polkadot/api';
+import { assertNotNull, DataHandlerContext } from '@subsquid/substrate-processor';
+
+async function initializeApi() {
+    const wsProvider = new WsProvider(assertNotNull(process.env.RPC_ENDPOINT, 'No RPC endpoint supplied')); // Replace with your chain's WebSocket endpoint
+    const api = await ApiPromise.create({ provider: wsProvider });
+    return api;
+}
 
 processor.run(new TypeormDatabase({ supportHotBlocks: true }), async (ctx) => {
+    const api = await initializeApi(); // Step 1: Initialize API
     let transferEvents: TransferEvent[] = getTransferEvents(ctx);
-    let assetTransferEvents: AssetTransferEvent[] = getAssetTransferEvents(ctx);
+    let assetTransferEvents: AssetTransferEvent[] = await getAssetTransferEvents(ctx);
 
     let accounts: Map<string, Account> = await createAccounts(ctx, transferEvents, assetTransferEvents);
-    let assets: Map<string, Asset> = await createAssets(ctx, assetTransferEvents);
+    let assets: Map<string, Asset> = await createAssets(ctx, assetTransferEvents, api);
     let transfers: Transfer[] = createTransfers(transferEvents, accounts);
     let assetTransfers: AssetTransfer[] = createAssetTransfers(assetTransferEvents, accounts, assets);
 
@@ -149,7 +160,7 @@ async function createAccounts(ctx: ProcessorContext<Store>, transferEvents: Tran
     return accounts;
 }
 
-async function createAssets(ctx: ProcessorContext<Store>, assetTransferEvents: AssetTransferEvent[]): Promise<Map<string, Asset>> {
+async function createAssets(ctx: ProcessorContext<Store>, assetTransferEvents: AssetTransferEvent[], api: ApiPromise): Promise<Map<string, Asset>> {
     const assetIds = new Set<string>();
     for (let t of assetTransferEvents) {
         assetIds.add(t.assetId);
@@ -157,18 +168,31 @@ async function createAssets(ctx: ProcessorContext<Store>, assetTransferEvents: A
 
     // Fetch existing assets from the store
     const assets = await ctx.store.findBy(Asset, { id: In([...assetIds]) }).then((assets) => {
-        console.log('Fetched assets:', assets);
-        assets.forEach((asset) => {
-            console.log(`Asset ID: ${asset.id}, Asset Name: ${asset.name}`);
-        });
         return new Map(assets.map((a) => [a.id, a]));
     });
-    
+
     // Initialize assets that do not exist in the store
     for (let id of assetIds) {
         if (!assets.has(id)) {
             // If asset is new, initialize with zero total supply and an optional name field.
-            assets.set(id, new Asset({ id, totalSupply: 0n, name: `Asset-${id}` }));
+            const metadata = await api.query.assets.metadata(id);
+            if (metadata) {
+                 // Extract name and symbol
+                const metadataHuman = metadata.toHuman();
+
+                const name = (metadataHuman && typeof metadataHuman === 'object' && 'name' in metadataHuman) 
+                    ? metadataHuman.name  : `Asset-${id}`;  // Fallback if name is not available
+
+                const symbol = (metadataHuman && typeof metadataHuman === 'object' && 'symbol' in metadataHuman) 
+                    ? metadataHuman.symbol  : `SYM-${id}`;  // Optional fallback for symbol
+
+
+                console.log(`Metadata for asset ${id}:`, metadata.toHuman());
+                assets.set(id, new Asset({ id, totalSupply: 0n, name: symbol?.toString() }));
+            } else {
+                assets.set(id, new Asset({ id, totalSupply: 0n, name: `Asset-${id}` })); // Fallback name
+            }
+            // assets.set(id, new Asset({ id, totalSupply: 0n, name: `Asset-${id}` }));
         }
     }
 

@@ -222,3 +222,7 @@ For instance, account data is passed to the handler context as a plain byte arra
 It is possible to extend `squid-graphql-server(1)` with custom
 [type-graphql](https://typegraphql.com) resolvers and to add request validation.
 For more details, consult [docs](https://docs.subsquid.io/graphql-api/).
+
+
+# Additional command to install papi
+npm install @polkadot/api @polkadot/types @polkadot/util
