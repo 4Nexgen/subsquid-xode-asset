@@ -9,7 +9,8 @@
     },
     "Assets": {
       "events": [
-        "Transferred"
+        "Transferred",
+        "MetadataSet"
       ]
     }
   }

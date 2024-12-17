@@ -23,6 +23,9 @@ type Asset @entity {
   id: ID!
   "Name or symbol of the asset"
   name: String
+  symbol: String
+  decimals: Int
+  isFrozen: Boolean
   "Total supply of the asset"
   totalSupply: BigInt!
   "List of transfers for this asset"
@@ -38,4 +41,5 @@ type AssetTransfer @entity {
   from: Account
   to: Account
   amount: BigInt! @index
+  fee: BigInt # fee is calculated at the best effort and may be zero for some old extrinsics
 }

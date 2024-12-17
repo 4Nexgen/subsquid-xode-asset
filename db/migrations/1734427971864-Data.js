@@ -1,5 +1,5 @@
-module.exports = class Data1734084918416 {
-    name = 'Data1734084918416'
+module.exports = class Data1734427971864 {
+    name = 'Data1734427971864'
 
     async up(db) {
         await db.query(`CREATE TABLE "transfer" ("id" character varying NOT NULL, "block_number" integer NOT NULL, "timestamp" TIMESTAMP WITH TIME ZONE NOT NULL, "extrinsic_hash" text, "amount" numeric NOT NULL, "fee" numeric, "from_id" character varying, "to_id" character varying, CONSTRAINT "PK_fd9ddbdd49a17afcbe014401295" PRIMARY KEY ("id"))`)
@@ -9,8 +9,8 @@ module.exports = class Data1734084918416 {
         await db.query(`CREATE INDEX "IDX_76bdfed1a7eb27c6d8ecbb7349" ON "transfer" ("from_id") `)
         await db.query(`CREATE INDEX "IDX_0751309c66e97eac9ef1149362" ON "transfer" ("to_id") `)
         await db.query(`CREATE INDEX "IDX_f4007436c1b546ede08a4fd7ab" ON "transfer" ("amount") `)
-        await db.query(`CREATE TABLE "asset" ("id" character varying NOT NULL, "name" text, "total_supply" numeric NOT NULL, CONSTRAINT "PK_1209d107fe21482beaea51b745e" PRIMARY KEY ("id"))`)
-        await db.query(`CREATE TABLE "asset_transfer" ("id" character varying NOT NULL, "block_number" integer NOT NULL, "timestamp" TIMESTAMP WITH TIME ZONE NOT NULL, "extrinsic_hash" text, "amount" numeric NOT NULL, "asset_id" character varying, "from_id" character varying, "to_id" character varying, CONSTRAINT "PK_d6055020b87303085fec8d88f5f" PRIMARY KEY ("id"))`)
+        await db.query(`CREATE TABLE "asset" ("id" character varying NOT NULL, "name" text, "symbol" text, "decimals" integer, "is_frozen" boolean, "total_supply" numeric NOT NULL, CONSTRAINT "PK_1209d107fe21482beaea51b745e" PRIMARY KEY ("id"))`)
+        await db.query(`CREATE TABLE "asset_transfer" ("id" character varying NOT NULL, "block_number" integer NOT NULL, "timestamp" TIMESTAMP WITH TIME ZONE NOT NULL, "extrinsic_hash" text, "amount" numeric NOT NULL, "fee" numeric, "asset_id" character varying, "from_id" character varying, "to_id" character varying, CONSTRAINT "PK_d6055020b87303085fec8d88f5f" PRIMARY KEY ("id"))`)
         await db.query(`CREATE INDEX "IDX_dbef0cba171ad4e9bd38e1e6ba" ON "asset_transfer" ("block_number") `)
         await db.query(`CREATE INDEX "IDX_33a1e46edadccdaa07bc5fdcee" ON "asset_transfer" ("timestamp") `)
         await db.query(`CREATE INDEX "IDX_fe9345ff2c5e54e565443d5a7b" ON "asset_transfer" ("extrinsic_hash") `)

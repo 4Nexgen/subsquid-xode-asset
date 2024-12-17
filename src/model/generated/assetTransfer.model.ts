@@ -38,4 +38,7 @@ export class AssetTransfer {
     @Index_()
     @BigIntColumn_({nullable: false})
     amount!: bigint
+
+    @BigIntColumn_({nullable: true})
+    fee!: bigint | undefined | null
 }

@@ -16,3 +16,20 @@ export const transferred =  {
         })
     ),
 }
+
+export const metadataSet =  {
+    name: 'Assets.MetadataSet',
+    /**
+     * New metadata has been set for an asset.
+     */
+    v1: new EventType(
+        'Assets.MetadataSet',
+        sts.struct({
+            assetId: sts.number(),
+            name: sts.bytes(),
+            symbol: sts.bytes(),
+            decimals: sts.number(),
+            isFrozen: sts.boolean(),
+        })
+    ),
+}

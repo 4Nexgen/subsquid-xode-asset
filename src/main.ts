@@ -1,15 +1,16 @@
 import { TypeormDatabase, Store } from '@subsquid/typeorm-store';
-import { In } from 'typeorm';
+import { In, Int32 } from 'typeorm';
 import * as ss58 from '@subsquid/ss58';
 import assert from 'assert';
 
 import { processor, ProcessorContext } from './processor';
-import { Account, Transfer, Asset, AssetTransfer } from './model'; // Add Asset and AssetTransfer models
+import { Account, Transfer, Asset, AssetTransfer } from './model'; // Import models
 import { events } from './types';
 import { ALL } from 'dns';
 
 import { ApiPromise, WsProvider } from '@polkadot/api';
 import { assertNotNull, DataHandlerContext } from '@subsquid/substrate-processor';
+import { boolean } from './model/generated/marshal';
 
 async function initializeApi() {
     const wsProvider = new WsProvider(assertNotNull(process.env.RPC_ENDPOINT, 'No RPC endpoint supplied')); // Replace with your chain's WebSocket endpoint
@@ -53,6 +54,7 @@ interface AssetTransferEvent {
     to?: string;
     assetId: string;
     amount: bigint;
+    fee?: bigint; // Added fee
 }
 
 function getTransferEvents(ctx: ProcessorContext<Store>): TransferEvent[] {
@@ -62,20 +64,19 @@ function getTransferEvents(ctx: ProcessorContext<Store>): TransferEvent[] {
     for (let block of ctx.blocks) {
         for (let event of block.events) {
             if (event.name == events.balances.transfer.name) {
-                let rec: { from: string; to: string; amount: bigint };
+                let rec: { from: string; to: string; amount: bigint; fee?: bigint };
 
                 // Handle different versions of the transfer event
                 if (events.balances.transfer.v1.is(event)) {
                     // If `decode` returns an object, destructure its properties
                     const decoded = events.balances.transfer.v1.decode(event);
-                    rec = { from: decoded.from, to: decoded.to, amount: decoded.amount };
+                    rec = { from: decoded.from, to: decoded.to, amount: decoded.amount, fee: event.extrinsic?.fee };
                 } else {
                     throw new Error('Unsupported transfer event version');
                 }
 
                 // Ensure that the timestamp is available
                 assert(block.header.timestamp, `Got an undefined timestamp at block ${block.header.height}`);
-
                 transfers.push({
                     id: event.id,
                     blockNumber: block.header.height,
@@ -84,7 +85,7 @@ function getTransferEvents(ctx: ProcessorContext<Store>): TransferEvent[] {
                     from: ss58Codec.encode(rec.from),
                     to: ss58Codec.encode(rec.to),
                     amount: rec.amount,
-                    fee: event.extrinsic?.fee || 0n,
+                    fee: rec.fee || 0n,
                 });
             }
         }
@@ -93,7 +94,6 @@ function getTransferEvents(ctx: ProcessorContext<Store>): TransferEvent[] {
     return transfers;
 }
 
-
 function getAssetTransferEvents(ctx: ProcessorContext<Store>): AssetTransferEvent[] {
     let assetTransfers: AssetTransferEvent[] = [];
     const ss58Codec = ss58.codec(42); // Replace 42 with your chain's SS58 prefix.
@@ -101,16 +101,17 @@ function getAssetTransferEvents(ctx: ProcessorContext<Store>): AssetTransferEven
     for (let block of ctx.blocks) {
         for (let event of block.events) {
             if (event.name == events.assets.transferred.name) {
-                let rec: { assetId: string; from?: string; to?: string; amount: bigint };
+                let rec: { assetId: string; from?: string; to?: string; amount: bigint; fee?: bigint };
 
                 // Handle different versions of the assets transfer event
                 if (events.assets.transferred.v1.is(event)) {
                     let decoded = events.assets.transferred.v1.decode(event);
                     rec = {
-                        assetId: decoded.assetId.toString(), // Convert assetId from bigint to string
+                        assetId: decoded.assetId.toString(),
                         from: decoded.from ? decoded.from.toString() : undefined,
                         to: decoded.to ? decoded.to.toString() : undefined,
                         amount: decoded.amount,
+                        fee: event.extrinsic?.fee, // Added fee
                     };
                 } else {
                     throw new Error('Unsupported asset transfer event version');
@@ -118,7 +119,6 @@ function getAssetTransferEvents(ctx: ProcessorContext<Store>): AssetTransferEven
 
                 assert(block.header.timestamp, `Got an undefined timestamp at block ${block.header.height}`);
 
-                // Push the processed asset transfer into the array
                 assetTransfers.push({
                     id: event.id,
                     blockNumber: block.header.height,
@@ -128,6 +128,7 @@ function getAssetTransferEvents(ctx: ProcessorContext<Store>): AssetTransferEven
                     to: rec.to ? ss58Codec.encode(rec.to) : undefined,
                     assetId: rec.assetId,
                     amount: rec.amount,
+                    fee: rec.fee || 0n, // Added fee
                 });
             }
         }
@@ -168,6 +169,7 @@ async function createAssets(ctx: ProcessorContext<Store>, assetTransferEvents: A
 
     // Fetch existing assets from the store
     const assets = await ctx.store.findBy(Asset, { id: In([...assetIds]) }).then((assets) => {
+
         return new Map(assets.map((a) => [a.id, a]));
     });
 
@@ -186,9 +188,14 @@ async function createAssets(ctx: ProcessorContext<Store>, assetTransferEvents: A
                 const symbol = (metadataHuman && typeof metadataHuman === 'object' && 'symbol' in metadataHuman) 
                     ? metadataHuman.symbol  : `SYM-${id}`;  // Optional fallback for symbol
 
+                const isFrozen = (metadataHuman && typeof metadataHuman === 'object' && 'isFrozen' in metadataHuman) 
+                    ? metadataHuman.isFrozen  : `SYM-${id}`;  // Optional fallback for isFrozen
+                
+                const decimals = (metadataHuman && typeof metadataHuman === 'object' && 'decimals' in metadataHuman) 
+                    ? metadataHuman.decimals  : `SYM-${id}`;  // Optional fallback for decimals
 
                 console.log(`Metadata for asset ${id}:`, metadata.toHuman());
-                assets.set(id, new Asset({ id, totalSupply: 0n, name: symbol?.toString() }));
+                assets.set(id, new Asset({ id, totalSupply: 0n, name: name?.toString(), symbol: symbol?.toString(), isFrozen: Boolean(isFrozen), decimals: Number(decimals)}));
             } else {
                 assets.set(id, new Asset({ id, totalSupply: 0n, name: `Asset-${id}` })); // Fallback name
             }
@@ -207,7 +214,6 @@ async function createAssets(ctx: ProcessorContext<Store>, assetTransferEvents: A
 
     return assets;
 }
-
 
 function createTransfers(transferEvents: TransferEvent[], accounts: Map<string, Account>): Transfer[] {
     let transfers: Transfer[] = [];
@@ -232,7 +238,7 @@ function createTransfers(transferEvents: TransferEvent[], accounts: Map<string, 
 function createAssetTransfers(assetTransferEvents: AssetTransferEvent[], accounts: Map<string, Account>, assets: Map<string, Asset>): AssetTransfer[] {
     let assetTransfers: AssetTransfer[] = [];
     for (let t of assetTransferEvents) {
-        let { id, blockNumber, timestamp, extrinsicHash, amount, assetId } = t;
+        let { id, blockNumber, timestamp, extrinsicHash, amount, assetId, fee } = t;
         let from = t.from ? accounts.get(t.from) : undefined;
         let to = t.to ? accounts.get(t.to) : undefined;
         let asset = assets.get(assetId)!;
@@ -245,6 +251,7 @@ function createAssetTransfers(assetTransferEvents: AssetTransferEvent[], account
             from,
             to,
             amount,
+            fee,
             asset,
         }));
     }
