@@ -4,10 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "${GQL_PORT}:4350"  # Use GQL_PORT from .env
+      - "23798:4350"  # Use GQL_PORT from .env
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgres://user:postgres@db:5432/${DB_NAME}  # Use DB_NAME from .env
+      - DATABASE_URL=postgres://user:postgres@db:5432/squid  # Use DB_NAME from .env
       - RPC_ENDPOINT=wss://rpcnodea01.xode.net/n7yoxCmcIrCF6VziCcDmYTwL8R03a/rpc  # Use RPC_ENDPOINT from .env
       # Uncomment the next line to enable debug mode
       # - SQD_DEBUG=*
