@@ -38,4 +38,4 @@ jobs:
         run: npm run build
 
       - name: Run tests
-        run: npx sqd run .
+        run: ./deploy.sh
