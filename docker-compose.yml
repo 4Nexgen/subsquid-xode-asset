@@ -1,30 +1,12 @@
-services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "23798:4350"  # Use GQL_PORT from .env
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgres://user:postgres@db:5432/squid  # Use DB_NAME from .env
-      - RPC_ENDPOINT=wss://rpcnodea01.xode.net/n7yoxCmcIrCF6VziCcDmYTwL8R03a/rpc  # Use RPC_ENDPOINT from .env
-      # Uncomment the next line to enable debug mode
-      # - SQD_DEBUG=*
-    depends_on:
-      - db
+version: "3"
 
+services:
   db:
     image: postgres:15
     environment:
-      POSTGRES_DB: squid  # Use DB_NAME from .env
-      POSTGRES_USER: user
+      POSTGRES_DB: squid
       POSTGRES_PASSWORD: postgres
-    shm_size: 1gb
     ports:
-      - "23798:5432"  # Use DB_PORT from .env
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "user"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "${DB_PORT}:5432"
+      # command: ["postgres", "-c", "log_statement=all"]
+    shm_size: 1gb
