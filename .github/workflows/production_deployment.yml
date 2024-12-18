@@ -32,7 +32,7 @@ jobs:
         run: npm install
 
       - name: Install Polkadot API dependencies
-        run: npm npm install @polkadot/api @polkadot/types @polkadot/util
+        run: npm install @polkadot/api @polkadot/types @polkadot/util
 
       - name: Build the project
         run: npm run build
