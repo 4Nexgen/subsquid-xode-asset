@@ -1,21 +1,20 @@
 #!/bin/bash
 
-# Node Refresh
+# Use a specific version or alternative bash (e.g., /usr/bin/bash or /bin/bash)
+# You can replace /bin/bash with any shell path you prefer, like /usr/bin/bash.
+
 echo "Rebuilding the Node application..."
 npm run build
 sleep 3
 
-# Ensure you are in the correct directory
 echo "Stopping Docker Compose..."
 sudo docker compose down
 
-# Delay before starting Docker Compose
 sleep 3
 
 echo "Starting Docker Compose..."
 sudo docker compose up -d
 
-# Delay to ensure all services are up and running
 sleep 3
 
 echo "Removing old migrations..."
@@ -29,15 +28,17 @@ sleep 2
 echo "Generating new migrations..."
 npx squid-typeorm-migration generate
 
-# Delay before applying migrations
 sleep 2
 
 echo "Applying migrations..."
 npx squid-typeorm-migration apply
 sleep 5
 
-# Delay before starting the application
 sleep 3
 
 echo "Starting the application..."
-node -r dotenv/config lib/main.js
+/bin/bash -c "node -r dotenv/config lib/main.js &"  # Start Node app with specific bash
+
+# Run GraphQL server in another bash shell or terminal emulator
+echo "Starting GraphQL server in a separate terminal or background..."
+/bin/bash -c "npx squid-graphql-server &"  # Using bash to run GraphQL server in the background
