@@ -7,7 +7,7 @@ deploy:
   addons:
     postgres: 
     rpc:
-      - kusama.http
+      - wss://rpcnodea01.xode.net/n7yoxCmcIrCF6VziCcDmYTwL8R03a/rpc
   processor:
     cmd:
       - sqd
